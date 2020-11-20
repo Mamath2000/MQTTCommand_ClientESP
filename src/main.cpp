@@ -3,15 +3,12 @@
 #include <PubSubClient.h>
 #include <SoftwareSerial.h> //Included SoftwareSerial Library
 
-#define DEBUG ;
+//Debug Option
+//#define DEBUG
 
 const char *mqtt_server = "192.168.1.79";
 
-// unsigned long lastMsg = 0;
-// #define MSG_BUFFER_SIZE (50)
-// char msg[MSG_BUFFER_SIZE];
-// int value = 0;
-
+// Wifi Setting
 #ifndef STASSID
 #define STASSID "Livebox-19E2"
 #define STAPSK "hcTzdCTZAqgVLxmKbM"
@@ -20,20 +17,91 @@ const char *mqtt_server = "192.168.1.79";
 const char *ssid = STASSID;
 const char *password = STAPSK;
 
-// unsigned long lastTime = 0;
-// unsigned long timerDelay = 100; // send readings timer
-
+// Serial with Arduino
 int pinSoftRX = D6; // D6
 int pinSoftTX = D5; // D5
 
+//Function
 void blink(int nb, int wait);
 void reconnect();
+void setup_serial();
+void setup_wifi();
+void setup_mqtt();
+String readSerial();
 
 // Use WiFiClient class to create TCP connections
 WiFiClient espClient;
 PubSubClient mqttClient(espClient);
 SoftwareSerial arvSerial(pinSoftRX, pinSoftTX);
 
+// MQTT Topics
+String mainTopic = "proto1";
+String cmndTopic = "cmnd";
+String topic = cmndTopic + "/" + mainTopic + "/move";
+
+// /------------------------------------------------------------------------------/
+void setup()
+{
+
+    setup_serial();
+
+    setup_wifi();
+
+    setup_mqtt();
+
+    digitalWrite(LED_BUILTIN, HIGH);
+}
+
+
+// /------------------------------------------------------------------------------/
+void loop()
+{
+    //     // if ((millis() - lastTime) > timerDelay)
+    //     // {
+    //     // Read value of command
+    String data = readSerial();
+
+    if (data != "")
+    {
+
+        mqttClient.publish(topic.c_str(), data.c_str());
+#ifdef DEBUG
+        Serial.println(data);
+#endif
+        digitalWrite(LED_BUILTIN, LOW);
+    }
+
+    //   lastTime = millis();
+    // }
+}
+
+// /------------------------------------------------------------------------------/
+// /---- SUPPORT METHODES --------------------------------------------------------/
+// /------------------------------------------------------------------------------/
+
+// /Read serial communication with Arduino ---------------------------------------/
+String readSerial()
+{
+    char chr;
+    String data = "";
+
+    do
+    {
+        if (arvSerial.available())
+        {
+            digitalWrite(LED_BUILTIN, HIGH);
+
+            chr = arvSerial.read();
+            if (chr != '#')
+                data.concat(chr);
+        }
+    } while (chr != '#');
+
+    arvSerial.flush();
+    return data;
+}
+
+// /Wifi Setup -------------------------------------------------------------------/
 void setup_wifi()
 {
     blink(1, 200);
@@ -65,6 +133,7 @@ void setup_wifi()
     Serial.println(WiFi.localIP());
 }
 
+// /Serial Setup -------------------------------------------------------------------/
 void setup_serial()
 {
     pinMode(LED_BUILTIN, OUTPUT); // Initialize the BUILTIN_LED pin as an output
@@ -74,13 +143,12 @@ void setup_serial()
 
     arvSerial.begin(9600);
 
-#ifdef DEBUG
     //Serial for debug
     Serial.begin(115200);
     Serial.println("Démarrage de l'ESP");
-#endif
 }
 
+// /MQTT Setup -------------------------------------------------------------------/
 void setup_mqtt()
 {
     mqttClient.setServer(mqtt_server, 1883);
@@ -91,6 +159,7 @@ void setup_mqtt()
     // mqttClient.loop();
 }
 
+// /MQTT reconnect -------------------------------------------------------------------/
 void reconnect()
 {
     // Loop until we're reconnected
@@ -111,73 +180,13 @@ void reconnect()
         {
             Serial.print("failed, rc=");
             Serial.print(mqttClient.state());
-            Serial.println(" try again in 5 seconds");
+            Serial.println(" try again in 3 seconds");
             // Wait 5 seconds before retrying
             delay(3000);
         }
     }
 }
 
-void setup()
-{
-
-    setup_serial();
-
-    setup_wifi();
-
-    setup_mqtt();
-
-    digitalWrite(LED_BUILTIN, HIGH);
-}
-
-String readSerial()
-{
-    char chr;
-    String data = "";
-
-    do
-    {
-        if (arvSerial.available())
-        {
-            digitalWrite(LED_BUILTIN, HIGH);
-
-            chr = arvSerial.read();
-            if (chr != '#')
-                data.concat(chr);
-        }
-    } while (chr != '#');
-
-    arvSerial.flush();
-    return data;
-}
-
-String mainTopic = "proto1";
-String cmndTopic = "cmnd";
-String topic = cmndTopic + "/" + mainTopic + "/move";
-String data;
-
-void loop()
-{
-    //     // if ((millis() - lastTime) > timerDelay)
-    //     // {
-    //     // Read value of command
-    String data = readSerial();
-
-    if (data != "")
-    {
-
-        mqttClient.publish("cmnd/remote/value", data.c_str());
-        Serial.println(data);
-        digitalWrite(LED_BUILTIN, LOW);
-    }
-
-    //   lastTime = millis();
-    // }
-}
-
-// /------------------------------------------------------------------------------/
-// /---- SUPPORT METHODES --------------------------------------------------------/
-// /------------------------------------------------------------------------------/
 void blink(int nb, int wait)
 {
     for (byte i = 0; i < nb; i++)
