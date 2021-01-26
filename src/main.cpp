@@ -45,7 +45,7 @@ void setup()
 
     setup_serial();
 
-    setup_wifi();
+//    setup_wifi();
 
     setup_mqtt();
 
